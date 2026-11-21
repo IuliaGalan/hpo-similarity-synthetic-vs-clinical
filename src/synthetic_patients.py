@@ -1,90 +1,6 @@
 
 import random
 
-
-def generate_synthetic_patient(
-    disease_profiles,
-    hpo_graph,
-    retention_rate=0.6,
-    noise_count=2,
-    random_seed=None
-):
-    """
-    Generate one synthetic patient from a randomly selected disease.
-
-    Parameters
-    ----------
-    disease_profiles : dict
-        Mapping between disease IDs and their HPO phenotype sets.
-    hpo_graph : networkx.DiGraph
-        HPO ontology graph.
-    retention_rate : float
-        Proportion of disease phenotypes to retain.
-    noise_count : int
-        Number of unrelated phenotype terms to add.
-    random_seed : int or None
-        Seed for reproducibility.
-
-    Returns
-    -------
-    dict
-        Synthetic patient information, including the true disease ID,
-        retained phenotype terms and added noise terms.
-    """
-
-    if not 0 < retention_rate <= 1:
-        raise ValueError("retention_rate must be in (0, 1].")
-
-    if noise_count < 0:
-        raise ValueError("noise_count must be non-negative.")
-
-    rng = random.Random(random_seed)
-
-    # Keep diseases with at least one valid HPO phenotype.
-    valid_profiles = {
-        disease_id: set(terms) & set(hpo_graph.nodes)
-        for disease_id, terms in disease_profiles.items()
-        if set(terms) & set(hpo_graph.nodes)
-    }
-
-    if not valid_profiles:
-        raise ValueError("No diseases with valid HPO phenotype terms.")
-
-    # Randomly select a disease.
-    disease_id = rng.choice(list(valid_profiles.keys()))
-    disease_terms = valid_profiles[disease_id]
-
-    # Select a subset of the disease phenotypes.
-    retained_count = max(
-        1,
-        round(len(disease_terms) * retention_rate)
-    )
-
-    original_terms = set(
-        rng.sample(sorted(disease_terms), retained_count)
-    )
-
-    # Build a pool of HPO terms not belonging to the selected disease.
-    noise_pool = set(hpo_graph.nodes) - disease_terms
-
-    if noise_count > len(noise_pool):
-        raise ValueError("Not enough HPO terms available for noise.")
-
-    noise_terms = set(
-        rng.sample(sorted(noise_pool), noise_count)
-    )
-
-    # Combine original and noise phenotypes.
-    patient_terms = original_terms | noise_terms
-
-    return {
-        "true_disease_id": disease_id,
-        "phenotype_terms": patient_terms,
-        "original_terms": original_terms,
-        "noise_terms": noise_terms
-    }
-
-
 def sample_phenotypes_from_frequency_profile(
     frequency_profile,
     unknown_frequency_sample_size=11,
@@ -249,11 +165,13 @@ def generate_synthetic_patient_for_disease(
 
 
 
+
 def generate_synthetic_patients(
     disease_frequency_profiles,
     n_per_disease=100,
     unknown_frequency_sample_size=11,
-    random_seed=None
+    random_seed=None,
+    max_attempts=100
 ):
     """
     Generate multiple synthetic patients for every disease.
@@ -262,25 +180,27 @@ def generate_synthetic_patients(
     ----------
     disease_frequency_profiles : dict
         Mapping between disease IDs and phenotype frequency profiles.
-
     n_per_disease : int
         Number of patients to generate for each disease.
-
     unknown_frequency_sample_size : int
         Maximum number of phenotypes sampled when all frequencies
         are unknown.
-
     random_seed : int or None
         Seed for reproducibility.
+    max_attempts : int
+        Maximum number of attempts to generate a non-empty phenotype
+        profile for each patient.
 
     Returns
     -------
     list
         List of generated synthetic patients.
     """
-
     if n_per_disease < 1:
         raise ValueError("n_per_disease must be at least 1.")
+
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1.")
 
     rng = random.Random(random_seed)
 
@@ -294,7 +214,8 @@ def generate_synthetic_patients(
                 disease_id=disease_id,
                 disease_frequency_profiles=disease_frequency_profiles,
                 unknown_frequency_sample_size=unknown_frequency_sample_size,
-                random_seed=rng.randint(0, 2**32 - 1)
+                random_seed=rng.randint(0, 2**32 - 1),
+                max_attempts=max_attempts
             )
 
             patient["patient_id"] = (
