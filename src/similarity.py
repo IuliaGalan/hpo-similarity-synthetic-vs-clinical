@@ -142,3 +142,42 @@ def lin_similarity(term1, term2, hpo_graph, information_content):
 
 
 
+def jiang_conrath_similarity(term1, term2, hpo_graph, information_content):
+    """
+    Calculate Jiang-Conrath semantic similarity between two HPO terms.
+
+    The original Jiang-Conrath measure calculates semantic distance.
+    We transform this distance into a similarity score using:
+
+        similarity = 1 / (1 + distance)
+    """
+
+    if term1 not in hpo_graph or term2 not in hpo_graph:
+        raise ValueError("One or both HPO terms are not in the ontology.")
+
+    # Include each term itself and all its ancestors.
+    ancestors1 = nx.descendants(hpo_graph, term1) | {term1}
+    ancestors2 = nx.descendants(hpo_graph, term2) | {term2}
+
+    # Find common ancestors.
+    common_ancestors = ancestors1.intersection(ancestors2)
+
+    if not common_ancestors:
+        return 0.0
+
+    # Find the most informative common ancestor (MICA).
+    mica = max(
+        common_ancestors,
+        key=lambda term: information_content.get(term, 0.0)
+    )
+
+    ic_mica = information_content.get(mica, 0.0)
+    ic_term1 = information_content.get(term1, 0.0)
+    ic_term2 = information_content.get(term2, 0.0)
+
+    # Calculate Jiang-Conrath semantic distance.
+    distance = ic_term1 + ic_term2 - 2 * ic_mica
+
+    # Convert distance into similarity.
+    return 1 / (1 + distance)
+
