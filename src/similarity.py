@@ -93,3 +93,27 @@ def bma_similarity(profile1, profile2, hpo_graph, information_content):
     return (
         sum(best_matches_1) + sum(best_matches_2)
     ) / (len(profile1) + len(profile2))
+
+
+
+def asymmetric_similarity(patient_profile, disease_profile, hpo_graph, information_content):
+    """
+    Calculate asymmetric similarity between a patient and a disease.
+
+    For each patient phenotype, find its best matching disease phenotype.
+    The final score is the average of these best matches.
+    """
+
+    if not patient_profile or not disease_profile:
+        raise ValueError("Both patient and disease profiles must be non-empty.")
+
+    best_matches = [
+        max(
+            resnik_similarity(patient_term, disease_term,
+                              hpo_graph, information_content)
+            for disease_term in disease_profile
+        )
+        for patient_term in patient_profile
+    ]
+
+    return sum(best_matches) / len(best_matches)
